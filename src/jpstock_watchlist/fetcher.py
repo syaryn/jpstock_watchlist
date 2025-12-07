@@ -80,7 +80,13 @@ def fetch_stock_data(ticker: str) -> StockData:
     dividend_raw = info.get("dividendYield")
     dividend = 0.0
     if isinstance(dividend_raw, (int, float)):
-        dividend = dividend_raw * 100 if dividend_raw < 1 else float(dividend_raw)
+        # Normalize to percentage
+        if dividend_raw >= 0.1:
+            # Values like 0.91, 0.96 are already percentages
+            dividend = dividend_raw
+        else:
+            # Values like 0.0313, 0.0359 need * 100
+            dividend = dividend_raw * 100
 
     # Calculate score
     score = calculate_score(roe, eps_growth, per, pbr, dividend)
