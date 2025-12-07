@@ -1,0 +1,31 @@
+# Lefthook configuration for jpstock-watchlist
+# Enforces PEP8 compliance and type safety before commits
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.py"
+      run: ruff format --check {staged_files}
+      stage_fixed: true
+    
+    lint:
+      glob: "*.py"
+      run: ruff check {staged_files}
+      stage_fixed: true
+    
+    typecheck:
+      glob: "*.py"
+      run: uv run pyright {staged_files}
+
+pre-push:
+  parallel: true
+  commands:
+    format-all:
+      run: ruff format --check .
+    
+    lint-all:
+      run: ruff check .
+    
+    typecheck-all:
+      run: uv run pyright

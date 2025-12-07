@@ -1,0 +1,8 @@
+[tools]
+lefthook = "latest"
+python = "latest"
+ruff = "latest"
+uv = "latest"
+
+[env]
+_.file = ".env"
