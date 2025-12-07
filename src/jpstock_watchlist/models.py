@@ -17,7 +17,7 @@ class StockData(BaseModel):
     forward_pe: float | str = Field(..., description="Forward P/E ratio")
     pbr: float | str = Field(..., description="Price to Book ratio")
     dividend_yield: str = Field(..., description="Dividend yield percentage")
-    score: int = Field(..., ge=0, le=100, description="Investment score (0-100)")
+    score: int = Field(..., ge=0, le=155, description="Investment score (0-155)")
 
     class Config:
         """Pydantic model configuration."""

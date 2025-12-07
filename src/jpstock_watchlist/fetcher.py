@@ -22,35 +22,97 @@ def calculate_score(
         dividend: Dividend yield percentage
 
     Returns:
-        Investment score (0-100)
+        Investment score (0-155, max across all metrics)
     """
     score = 0
 
-    # ROE scoring (max 30 points)
-    if roe > 15:
-        score += 30
-    elif roe > 10:
-        score += 20
-
-    # EPS growth scoring (max 25 points)
-    if eps_growth > 20:
+    # ROE scoring (max 50 points)
+    if roe >= 25:
+        score += 50
+    elif roe >= 20:
+        score += 45
+    elif roe >= 18:
+        score += 42
+    elif roe >= 15:
+        score += 38
+    elif roe >= 12:
+        score += 32
+    elif roe >= 10:
         score += 25
-    elif eps_growth > 0:
-        score += 15
-
-    # P/E ratio scoring (max 20 points)
-    if isinstance(per, (int, float)) and per < 15:
-        score += 20
-    elif isinstance(per, (int, float)) and per < 20:
+    elif roe >= 8:
+        score += 18
+    elif roe >= 5:
         score += 10
+    elif roe > 0:
+        score += 5
 
-    # PBR scoring (max 15 points)
-    if isinstance(pbr, (int, float)) and pbr < 1.5:
+    # EPS growth scoring (max 35 points)
+    if eps_growth >= 100:
+        score += 35
+    elif eps_growth >= 70:
+        score += 30
+    elif eps_growth >= 50:
+        score += 27
+    elif eps_growth >= 30:
+        score += 22
+    elif eps_growth >= 10:
         score += 15
+    elif eps_growth >= 0:
+        score += 8
+    elif eps_growth >= -20:
+        score += 3
+    # else: score += 0 (below -20%)
 
-    # Dividend yield scoring (max 10 points)
-    if dividend > 3:
-        score += 10
+    # P/E ratio scoring (max 30 points)
+    if isinstance(per, (int, float)):
+        if per <= 8:
+            score += 30
+        elif per <= 10:
+            score += 27
+        elif per <= 12:
+            score += 23
+        elif per <= 15:
+            score += 18
+        elif per <= 18:
+            score += 12
+        elif per <= 20:
+            score += 8
+        elif per <= 25:
+            score += 3
+        # else: score += 0 (>25 or unavailable)
+
+    # PBR scoring (max 25 points)
+    if isinstance(pbr, (int, float)):
+        if pbr <= 0.7:
+            score += 25
+        elif pbr <= 0.9:
+            score += 22
+        elif pbr <= 1.1:
+            score += 18
+        elif pbr <= 1.3:
+            score += 14
+        elif pbr <= 1.6:
+            score += 10
+        elif pbr <= 2.0:
+            score += 5
+        # else: score += 0 (>2.0 or unavailable)
+
+    # Dividend yield scoring (max 15 points)
+    if dividend >= 5:
+        score += 15
+    elif dividend >= 4.5:
+        score += 13
+    elif dividend >= 4:
+        score += 11
+    elif dividend >= 3.5:
+        score += 9
+    elif dividend >= 3:
+        score += 7
+    elif dividend >= 2.5:
+        score += 5
+    elif dividend >= 2:
+        score += 3
+    # else: score += 0 (<2%)
 
     return score
 
