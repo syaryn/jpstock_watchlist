@@ -7,16 +7,17 @@ requires-python = ">=3.13"
 dependencies = [
     "pandas>=2.2.3",
     "pydantic>=2.12.5",
+    "rich>=13.9.4",
     "tabulate>=0.9.0",
     "yfinance>=0.2.66",
 ]
 
 [dependency-groups]
 dev = [
-    "pyright>=1.1.390",
     "ruff>=0.8.4",
     "pytest>=8.3.4",
     "pytest-cov>=6.0.0",
+    "ty>=0.0.7",
 ]
 
 [tool.ruff]
@@ -43,13 +44,9 @@ select = [
 [tool.ruff.lint.isort]
 known-first-party = ["jpstock_watchlist"]
 
-[tool.pyright]
-include = ["src", "main.py", "tests"]
-exclude = ["**/__pycache__", ".venv"]
-typeCheckingMode = "strict"
-reportMissingTypeStubs = false
-pythonVersion = "3.13"
-pythonPlatform = "Linux"
+[tool.ty.environment]
+python-version = "3.13"
+python = ".venv"
 
 [build-system]
 requires = ["hatchling"]

@@ -1,13 +1,14 @@
 # jpstock-watchlist
 
-日本株ウォッチリストをスコアリング付きで生成する、PEP8準拠・型安全なPythonプロジェクトです。mise/uv/ruff/pyright/lefthook で品質を自動担保します。
+日本株ウォッチリストをスコアリング付きで生成する、PEP8準拠・型安全なPythonプロジェクトです。mise/uv/ruff/ty/lefthook で品質を自動担保します。
 
 ## 主な機能
 - Yahoo Finance (yfinance) からリアルタイム株価データを取得
 - ROE / EPS成長率 / 予想PER / PBR / 配当利回りを用いた投資スコア算出
 - `output/YYYYMMDD.md` に日本語のMarkdown表を日次出力
 - `.env` の `TICKERS` で銘柄を簡単に切り替え
-- Pydantic + Pyright による型安全なデータ処理
+- Pydantic + ty による型安全なデータ処理
+- Rich によるターミナル表の表示
 - ruff / lefthook によるPEP8準拠と自動チェック
 
 ## 必要ツール
@@ -50,21 +51,18 @@ mise exec -- python main.py   # .env を自動読込（mise設定）
 実行すると環境変数 `TICKERS` の銘柄を取得し、スコア計算後に `output/YYYYMMDD.md` へMarkdown表を出力します。
 
 ### 出力カラム
-- ティッカー / 銘柄 / 現在値 / 前日比% / ROE / EPS成長 / 予想PER / PBR / 配当% / スコア（降順ソート）
+- ティッカー / 銘柄 / 現在値 / 前日比% / ROE / EPS成長 / 予想PER / PBR / 配当% / 時価総額 / スコア（降順ソート）
 
-### スコアリング基準（100点満点）
-- ROE: >15% → 30点, >10% → 20点
-- EPS成長: >20% → 25点, >0% → 15点
-- 予想PER: <15 → 20点, <20 → 10点
-- PBR: <1.5 → 15点
-- 配当利回り: >3% → 10点
+### スコアリング基準（最大175点）
+- ROE / EPS成長 / 予想PER / PBR / 配当利回りで加点
+- 時価総額は 5兆/1兆/1000億 を基準に +20 / +12 / +6（大型ほど加点）
 
 ## 開発フローと品質チェック
 コミット前に以下が通ることを推奨（lefthookが自動実行）：
 ```bash
 ruff format .        # フォーマット
 ruff check --fix .   # リント & 自動修正
-pyright              # 型チェック（strict）
+    ty check             # 型チェック
 pytest               # テスト
 ```
 
@@ -80,14 +78,13 @@ jpstock_watchlist/
 ├── output/                     # 生成されるレポート
 ├── tests/                      # テスト
 ├── pyproject.toml              # 依存・ツール設定
-├── pyrightconfig.json          # 型チェック設定
 ├── lefthook.yml                # Gitフック
 ├── mise.toml                   # ツールバージョン & .env読込
 └── .env.example                # 銘柄設定テンプレート
 ```
 
 ## 主要ランタイム依存
-- yfinance, pandas, tabulate, pydantic
+- yfinance, pandas, tabulate, pydantic, rich
 
 ## ライセンス
 [Add your license here]

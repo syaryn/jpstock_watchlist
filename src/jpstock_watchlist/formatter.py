@@ -8,6 +8,24 @@ import pandas as pd
 from jpstock_watchlist.models import StockData
 
 
+def format_market_cap(value: float | str | None) -> str:
+    """Format market capitalization with Japanese units."""
+    if value is None:
+        return "-"
+    if isinstance(value, str):
+        raw_value = value
+        try:
+            value = float(value)
+        except ValueError:
+            return raw_value
+
+    if value >= 1_000_000_000_000:
+        return f"{value / 1_000_000_000_000:.2f}兆円"
+    if value >= 100_000_000:
+        return f"{value / 100_000_000:.2f}億円"
+    return f"{value:,.0f}円"
+
+
 def format_markdown_table(data: list[StockData]) -> str:
     """Format stock data as markdown table.
 
@@ -32,9 +50,13 @@ def format_markdown_table(data: list[StockData]) -> str:
             "forward_pe": "予想PER",
             "pbr": "PBR",
             "dividend_yield": "配当%",
+            "market_cap": "時価総額",
             "score": "スコア",
         }
     )
+
+    if "時価総額" in df.columns:
+        df["時価総額"] = df["時価総額"].apply(format_market_cap)
 
     # Generate markdown table
     return df.to_markdown(index=False)  # type: ignore[return-value]

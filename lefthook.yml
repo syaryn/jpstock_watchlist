@@ -16,7 +16,7 @@ pre-commit:
     
     typecheck:
       glob: "*.py"
-      run: uv run pyright {staged_files}
+      run: uv run ty check {staged_files}
 
 pre-push:
   parallel: true
@@ -28,4 +28,4 @@ pre-push:
       run: ruff check .
     
     typecheck-all:
-      run: uv run pyright
+      run: uv run ty check

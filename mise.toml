@@ -10,7 +10,7 @@ _.file = ".env"
 [tasks]
 "fmt" = "ruff format ."
 "lint" = "ruff check --fix ."
-"type" = "pyright"
+"type" = "ty check"
 "test" = "pytest"
 "all" = { depends = ["fmt", "lint", "type", "test"] }
 "watch" = "uv run python main.py"

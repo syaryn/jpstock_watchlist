@@ -1,11 +1,13 @@
 """Stock data fetcher using yfinance API."""
 
+import math
+
 import yfinance as yf
 
 from jpstock_watchlist.models import StockData
 
 
-def calculate_score(
+def calculate_base_score(
     roe: float,
     eps_growth: float,
     per: float | str,
@@ -117,6 +119,63 @@ def calculate_score(
     return score
 
 
+def _percentile(sorted_values: list[float], p: float) -> float:
+    if not sorted_values:
+        return 0.0
+    if len(sorted_values) == 1:
+        return sorted_values[0]
+    index = (len(sorted_values) - 1) * p
+    lower = math.floor(index)
+    upper = math.ceil(index)
+    if lower == upper:
+        return sorted_values[int(index)]
+    fraction = index - lower
+    return (
+        sorted_values[lower] + (sorted_values[upper] - sorted_values[lower]) * fraction
+    )
+
+
+def _derive_market_cap_thresholds(
+    market_caps: list[float],
+) -> tuple[float, float, float]:
+    """Return fixed market cap thresholds for large-cap bonus."""
+    if not market_caps:
+        return (math.inf, math.inf, math.inf)
+    return (5_000_000_000_000, 1_000_000_000_000, 100_000_000_000)
+
+
+def _market_cap_bonus(
+    market_cap: float | None, thresholds: tuple[float, float, float]
+) -> int:
+    if market_cap is None:
+        return 0
+    high, mid, low = thresholds
+    if market_cap >= high:
+        return 20
+    if market_cap >= mid:
+        return 12
+    if market_cap >= low:
+        return 6
+    return 0
+
+
+def apply_market_cap_bonus(data: list[StockData]) -> list[StockData]:
+    """Apply market cap bonus based on the current distribution."""
+    market_caps = [
+        cap for cap in (stock.market_cap for stock in data) if isinstance(cap, float)
+    ]
+    thresholds = _derive_market_cap_thresholds(market_caps)
+    updated = [
+        stock.model_copy(
+            update={
+                "score": stock.score + _market_cap_bonus(stock.market_cap, thresholds)
+            }
+        )
+        for stock in data
+    ]
+    return sorted(updated, key=lambda stock: stock.score, reverse=True)
+
+
 def fetch_stock_data(ticker: str) -> StockData:
     """Fetch stock data from yfinance and calculate metrics.
 
@@ -138,6 +197,10 @@ def fetch_stock_data(ticker: str) -> StockData:
 
     per = info.get("forwardPE", "-")
     pbr = info.get("priceToBook", "-")
+    market_cap_raw = info.get("marketCap")
+    market_cap = (
+        float(market_cap_raw) if isinstance(market_cap_raw, (int, float)) else None
+    )
 
     dividend_raw = info.get("dividendYield")
     dividend = 0.0
@@ -151,7 +214,7 @@ def fetch_stock_data(ticker: str) -> StockData:
             dividend = dividend_raw * 100
 
     # Calculate score
-    score = calculate_score(roe, eps_growth, per, pbr, dividend)
+    score = calculate_base_score(roe, eps_growth, per, pbr, dividend)
 
     # Build StockData model
     return StockData(
@@ -164,6 +227,7 @@ def fetch_stock_data(ticker: str) -> StockData:
         forward_pe=per,
         pbr=pbr,
         dividend_yield=f"{dividend:.2f}%",
+        market_cap=market_cap,
         score=score,
     )
 
@@ -178,4 +242,4 @@ def fetch_watchlist(tickers: list[str]) -> list[StockData]:
         List of StockData models sorted by score (descending)
     """
     data = [fetch_stock_data(ticker) for ticker in tickers]
-    return sorted(data, key=lambda x: x.score, reverse=True)
+    return apply_market_cap_bonus(data)
