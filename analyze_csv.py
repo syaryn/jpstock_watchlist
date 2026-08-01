@@ -258,7 +258,7 @@ def main() -> None:
 
         # Boundary limit line in Rich
         if not boundary_inserted and (cumulative_total + stock_cost) > 2_400_000:
-            rich_cum_text = f"[bold yellow]↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)[/]"  # noqa: E501
+            rich_cum_text = f"[bold yellow]↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)[/]"
             table.add_row(
                 "---",
                 rich_cum_text,

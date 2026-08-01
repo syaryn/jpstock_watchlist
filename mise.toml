@@ -2,6 +2,7 @@
 lefthook = "latest"
 python = "latest"
 ruff = "latest"
+ty = "latest"
 uv = "latest"
 
 [env]
@@ -14,3 +15,4 @@ _.file = ".env"
 "test" = "pytest"
 "all" = { depends = ["fmt", "lint", "type", "test"] }
 "watch" = "uv run python main.py"
+"csv" = "uv run python analyze_csv.py"

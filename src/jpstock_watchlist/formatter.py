@@ -2,10 +2,10 @@
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pandas as pd
-
-from jpstock_watchlist.models import StockData
+if TYPE_CHECKING:
+    from jpstock_watchlist.models import StockData
 
 
 def format_market_cap(value: float | str | None) -> str:
@@ -27,16 +27,60 @@ def format_market_cap(value: float | str | None) -> str:
 
 
 def format_markdown_table(data: list[StockData]) -> str:
-    """Format stock data as markdown table.
+    """Format stock data as markdown table with a 2.4 million JPY boundary."""
+    processed_rows = []
+    cumulative_total = 0.0
+    boundary_inserted = False
 
-    Args:
-        data: List of StockData models
+    for stock in data:
+        price_val = 0.0
+        if stock.current_price != "-":
+            try:
+                price_val = float(stock.current_price)
+            except ValueError, TypeError:
+                pass
 
-    Returns:
-        Markdown-formatted table string
-    """
+        stock_cost = price_val * 100
+
+        # Boundary row when total > 2.4M JPY
+        if not boundary_inserted and (cumulative_total + stock_cost) > 2_400_000:
+            cum_text = (
+                f"**↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)**"
+            )
+            processed_rows.append(
+                {
+                    "ticker": "---",
+                    "name": cum_text,
+                    "current_price": "---",
+                    "change_percent": "---",
+                    "roe": "---",
+                    "eps_growth": "---",
+                    "forward_pe": "---",
+                    "pbr": "---",
+                    "dividend_yield": "---",
+                    "five_year_growth": "---",
+                    "high_52w_drop": "---",
+                    "market_cap": None,
+                    "score": "---",
+                    "is_per_missing": False,
+                    "is_eps_missing": False,
+                    "is_short_history": False,
+                }
+            )
+            boundary_inserted = True
+
+        cumulative_total += stock_cost
+        processed_rows.append(stock.model_dump())
+
     # Convert to DataFrame for easy table generation
-    df = pd.DataFrame([stock.model_dump() for stock in data])
+    import pandas as pd
+
+    df = pd.DataFrame(processed_rows)
+
+    # Drop internal metadata columns if they exist
+    for col in ["is_per_missing", "is_eps_missing", "is_short_history"]:
+        if col in df.columns:
+            df = df.drop(columns=[col])
 
     # Rename columns to Japanese
     df = df.rename(
@@ -49,7 +93,9 @@ def format_markdown_table(data: list[StockData]) -> str:
             "eps_growth": "EPS成長",
             "forward_pe": "予想PER",
             "pbr": "PBR",
-            "dividend_yield": "配当%",
+            "dividend_yield": "予想配当%",
+            "five_year_growth": "5年騰落",
+            "high_52w_drop": "高値下落%",
             "market_cap": "時価総額",
             "score": "スコア",
         }
