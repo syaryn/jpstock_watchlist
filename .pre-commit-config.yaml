@@ -1,0 +1,24 @@
+# Prek / pre-commit configuration for jpstock-watchlist
+repos:
+  - repo: local
+    hooks:
+      - id: format
+        name: ruff format
+        entry: ruff format --check
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: lint
+        name: ruff check
+        entry: ruff check
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: typecheck
+        name: ty check
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: true
