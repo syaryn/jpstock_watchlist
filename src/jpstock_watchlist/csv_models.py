@@ -27,3 +27,4 @@ class CSVStockData:
     payout_ratio: float | str
 
     score: int
+    is_jpx400: bool = False

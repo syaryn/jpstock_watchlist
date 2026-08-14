@@ -44,13 +44,17 @@ def parse_args() -> str:
         err_console.print("[bold red]Error:[/] 'input/' directory does not exist.")
         raise SystemExit(1)
 
-    csv_files = sorted(input_dir.glob("*.csv"), key=lambda p: p.name, reverse=True)
+    csv_files = sorted(
+        [p for p in input_dir.glob("*.csv") if p.name != "screener_result.csv"],
+        key=lambda p: p.name,
+        reverse=True,
+    )
     if not csv_files:
         from rich.console import Console
 
         err_console = Console(stderr=True)
         err_console.print(
-            "[bold red]Error:[/] No CSV files found in 'input/' directory."
+            "[bold red]Error:[/] No screening CSV files found in 'input/' directory."
         )
         raise SystemExit(1)
 
@@ -95,6 +99,7 @@ def save_csv_report_to_markdown(
         "コード",
         "会社名",
         "市場",
+        "JPX400",
         "業種",
         "直近終値",
         "時価総額",
@@ -112,6 +117,7 @@ def save_csv_report_to_markdown(
     ]
 
     aligns = [
+        ":---",
         ":---",
         ":---",
         ":---",
@@ -168,6 +174,7 @@ def save_csv_report_to_markdown(
                 "---",
                 "---",
                 "---",
+                "---",
             ]
             markdown_rows.append("| " + " | ".join(boundary_row) + " |")
             boundary_inserted = True
@@ -178,6 +185,7 @@ def save_csv_report_to_markdown(
             s.ticker,
             s.name,
             s.market,
+            "〇" if s.is_jpx400 else "-",  # noqa: RUF001
             s.sector,
             format_cell(s.current_price, "times"),
             format_market_cap(s.market_cap),
@@ -231,6 +239,7 @@ def main() -> None:
     table.add_column("コード", style="bold")
     table.add_column("会社名")
     table.add_column("市場")
+    table.add_column("JPX400", justify="center")
     table.add_column("業種")
     table.add_column("直近終値", justify="right")
     table.add_column("時価総額", justify="right")
@@ -277,6 +286,7 @@ def main() -> None:
                 "---",
                 "---",
                 "---",
+                "---",
             )
             boundary_inserted = True
 
@@ -286,6 +296,7 @@ def main() -> None:
             s.ticker,
             s.name,
             s.market,
+            "[bold green]〇[/]" if s.is_jpx400 else "-",  # noqa: RUF001
             s.sector,
             format_cell(s.current_price, "times"),
             format_market_cap(s.market_cap),
@@ -301,6 +312,8 @@ def main() -> None:
             format_cell(s.payout_ratio_total, "percent_1d"),
             str(s.score),
         )
+
+
 
     console.print(table)
 

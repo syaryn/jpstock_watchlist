@@ -6,6 +6,7 @@ from jpstock_watchlist.csv_analyzer import (
     find_col,
     get_market_cap_bonus,
     load_and_analyze_csv,
+    load_jpx400_tickers,
 )
 from jpstock_watchlist.csv_models import CSVStockData
 
@@ -75,11 +76,19 @@ def test_calculate_base_score_csv():
     assert score_bad == -115
 
 
+def test_load_jpx400_tickers():
+    tickers = load_jpx400_tickers("input/screener_result.csv")
+    assert len(tickers) > 0
+    assert "7203" in tickers
+    assert "7203.T" in tickers
+
+
 def test_load_and_analyze_csv():
     # Test loading real screening CSV in input/
     data = load_and_analyze_csv("input/screening_20260620.csv")
     assert len(data) > 0
     assert isinstance(data[0], CSVStockData)
+    assert any(s.is_jpx400 for s in data)
 
     # Assert sorted descending by score
     for i in range(len(data) - 1):
@@ -92,3 +101,4 @@ def test_load_and_analyze_csv():
 
     for i in range(len(data_new) - 1):
         assert data_new[i].score >= data_new[i + 1].score
+

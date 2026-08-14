@@ -330,11 +330,49 @@ def calculate_relative_scores_csv(
     return data
 
 
-def load_and_analyze_csv(filepath: str) -> list[CSVStockData]:
+def load_jpx400_tickers(
+    filepath: str | Path = Path("input/screener_result.csv"),
+) -> set[str]:
+    """Load JPX400 stock codes from a CSV file into a set of codes/tickers."""
+    path = Path(filepath)
+    if not path.exists():
+        return set()
+
+    codes = set()
+    for enc in ("utf-8-sig", "cp932", "utf-8"):
+        try:
+            with open(path, encoding=enc) as f:
+                reader = csv.DictReader(f)
+                if not reader.fieldnames:
+                    continue
+                code_col = find_col(list(reader.fieldnames), "コード")
+                if not code_col:
+                    continue
+                for row in reader:
+                    val = row.get(code_col)
+                    if val is not None:
+                        code_raw = str(val).strip()
+                        if code_raw.endswith(".0"):
+                            code_raw = code_raw[:-2]
+                        if code_raw:
+                            codes.add(code_raw)
+                            codes.add(f"{code_raw}.T")
+                break
+        except Exception:
+            continue
+    return codes
+
+
+def load_and_analyze_csv(
+    filepath: str,
+    jpx400_filepath: str | Path = Path("input/screener_result.csv"),
+) -> list[CSVStockData]:
     """Parse stock analysis CSV and calculate overall scores."""
     path = Path(filepath)
     if not path.exists():
         raise FileNotFoundError(f"CSV file not found: {filepath}")
+
+    jpx400_codes = load_jpx400_tickers(jpx400_filepath)
 
     # Read CSV with cp932/shift_jis using standard csv module
     with open(path, encoding="cp932", errors="replace") as f:
@@ -459,6 +497,8 @@ def load_and_analyze_csv(filepath: str) -> list[CSVStockData]:
     results = []
     for s in scored_stocks:
         total_score = s["base_score"] + s["rel_score"] + s["market_cap_bonus"]
+        code_raw = s["ticker"].split(".")[0]
+        is_jpx400 = (s["ticker"] in jpx400_codes) or (code_raw in jpx400_codes)
 
         # Build CSVStockData
         results.append(
@@ -480,8 +520,10 @@ def load_and_analyze_csv(filepath: str) -> list[CSVStockData]:
                 payout_ratio_total=s["payout_ratio_total"],
                 payout_ratio=s["payout_ratio"],
                 score=total_score,
+                is_jpx400=is_jpx400,
             )
         )
 
     # Sort descending by score
     return sorted(results, key=lambda x: x.score, reverse=True)
+
