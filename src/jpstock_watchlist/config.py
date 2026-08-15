@@ -1,18 +1,16 @@
-"""Application configuration using pydantic-settings."""
+"""Application configuration settings."""
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from dataclasses import dataclass
+from pathlib import Path
 
 
-class Settings(BaseSettings):
-    """Application settings loaded from environment and .env file."""
+@dataclass(slots=True)
+class Settings:
+    """Application default paths and configurations."""
 
-    tickers: str = ""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    input_dir: Path = Path("input")
+    output_dir: Path = Path("output")
+    jpx400_file: Path = Path("input/screener_result.csv")
 
 
 settings = Settings()
