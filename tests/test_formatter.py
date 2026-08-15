@@ -78,6 +78,39 @@ def test_format_markdown_table_with_boundary() -> None:
     assert "ここまでの累計: 1,500,000円" in table_md
 
 
+def test_format_markdown_table_missing_price_no_boundary() -> None:
+    # Stock 1 has no price (None), so cumulative calculation is unknown and boundary should NOT be emitted
+    data = [
+        make_dummy_stock("7203.T", 15000.0, 300),
+        CSVStockData(
+            ticker="9999.T",
+            name="No Price Stock",
+            market="プライム",
+            sector="サービス",
+            current_price=None,
+            market_cap=None,
+            roe=None,
+            roic=None,
+            dividend_yield=None,
+            peg_ratio=None,
+            div_growth_3y=None,
+            predicted_per=None,
+            pbr=None,
+            relative_52w=None,
+            payout_ratio_total=None,
+            payout_ratio=None,
+            score=280,
+        ),
+        make_dummy_stock("8035.T", 10000.0, 260),
+    ]
+
+    table_md = format_markdown_table(data)
+    assert "7203.T" in table_md
+    assert "9999.T" in table_md
+    assert "8035.T" in table_md
+    assert "累計240万円ライン" not in table_md
+
+
 def test_save_csv_report_to_markdown(tmp_path: Path) -> None:
     data = [
         make_dummy_stock("7203.T", 2000.0, 300),

@@ -27,11 +27,11 @@ def clean_val(val: object) -> float | None:
 
     if isinstance(val, (int, float)):
         f_val = float(val)
-        return None if math.isnan(f_val) else f_val
+        return f_val if math.isfinite(f_val) else None
 
     # Convert to string and normalize full-width characters (NFKC)
     s = unicodedata.normalize("NFKC", str(val)).strip()
-    if not s or s in ("-", "N/A", "nan", "null", "None", "--"):
+    if not s or s in ("-", "N/A", "nan", "null", "None", "--", "inf", "-inf", "+inf"):
         return None
 
     # Remove commas, percentage signs, yen signs, etc.
@@ -39,7 +39,7 @@ def clean_val(val: object) -> float | None:
 
     try:
         f_val = float(s)
-        return None if math.isnan(f_val) else f_val
+        return f_val if math.isfinite(f_val) else None
     except ValueError, TypeError:
         return None
 

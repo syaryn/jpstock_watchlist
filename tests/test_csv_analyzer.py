@@ -54,6 +54,17 @@ def test_clean_val():
     assert clean_val("１，５００") == 1500.0  # noqa: RUF001
     assert clean_val("５．２％") == 5.2  # noqa: RUF001
 
+    # Non-finite inputs (Infinity)
+    import math
+
+    assert clean_val(math.inf) is None
+    assert clean_val(-math.inf) is None
+    assert clean_val("inf") is None
+    assert clean_val("-inf") is None
+    assert clean_val("+inf") is None
+    assert clean_val("Infinity") is None
+    assert clean_val("-Infinity") is None
+
     # Invalid strings
     assert clean_val("abc") is None
     assert clean_val("---") is None

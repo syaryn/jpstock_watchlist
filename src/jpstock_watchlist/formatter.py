@@ -101,43 +101,45 @@ def format_markdown_table(data: list[CSVStockData]) -> str:
 
     cumulative_total = 0.0
     boundary_inserted = False
+    price_missing = False
 
     for s in data:
-        price_val = s.current_price if s.current_price is not None else 0.0
-        stock_cost = price_val * 100
+        if s.current_price is None:
+            price_missing = True
+        else:
+            stock_cost = s.current_price * 100
+            # Boundary logic (only if all preceding prices are known)
+            if (
+                not boundary_inserted
+                and not price_missing
+                and (cumulative_total + stock_cost) > NISA_GROWTH_LIMIT_JPY
+            ):
+                cum_text = f"**↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)**"
+                boundary_row = [
+                    "---",
+                    cum_text,
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                ]
+                markdown_rows.append("| " + " | ".join(boundary_row) + " |")
+                boundary_inserted = True
 
-        # Boundary logic
-        if (
-            not boundary_inserted
-            and (cumulative_total + stock_cost) > NISA_GROWTH_LIMIT_JPY
-        ):
-            cum_text = (
-                f"**↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)**"
-            )
-            boundary_row = [
-                "---",
-                cum_text,
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-            ]
-            markdown_rows.append("| " + " | ".join(boundary_row) + " |")
-            boundary_inserted = True
-
-        cumulative_total += stock_cost
+            if not price_missing:
+                cumulative_total += stock_cost
 
         row_cells = [
             s.ticker,
@@ -218,40 +220,44 @@ def create_rich_table(
 
     cumulative_total = 0.0
     boundary_inserted = False
+    price_missing = False
 
     for s in data:
-        price_val = s.current_price if s.current_price is not None else 0.0
-        stock_cost = price_val * 100
+        if s.current_price is None:
+            price_missing = True
+        else:
+            stock_cost = s.current_price * 100
+            # Boundary limit line in Rich (only if all preceding prices are known)
+            if (
+                not boundary_inserted
+                and not price_missing
+                and (cumulative_total + stock_cost) > NISA_GROWTH_LIMIT_JPY
+            ):
+                rich_cum_text = f"[bold yellow]↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)[/]"
+                table.add_row(
+                    "---",
+                    rich_cum_text,
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                    "---",
+                )
+                boundary_inserted = True
 
-        # Boundary limit line in Rich
-        if (
-            not boundary_inserted
-            and (cumulative_total + stock_cost) > NISA_GROWTH_LIMIT_JPY
-        ):
-            rich_cum_text = f"[bold yellow]↑ 累計240万円ライン (ここまでの累計: {int(cumulative_total):,}円)[/]"
-            table.add_row(
-                "---",
-                rich_cum_text,
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-                "---",
-            )
-            boundary_inserted = True
-
-        cumulative_total += stock_cost
+            if not price_missing:
+                cumulative_total += stock_cost
 
         table.add_row(
             s.ticker,
