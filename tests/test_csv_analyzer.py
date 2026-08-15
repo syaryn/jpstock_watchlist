@@ -1,5 +1,7 @@
 """Unit tests for CSV stock analyzer."""
 
+from pathlib import Path
+
 from jpstock_watchlist.csv_analyzer import (
     calculate_base_score_csv,
     clean_val,
@@ -7,8 +9,9 @@ from jpstock_watchlist.csv_analyzer import (
     get_market_cap_bonus,
     load_and_analyze_csv,
     load_jpx400_tickers,
+    read_csv_with_fallback,
 )
-from jpstock_watchlist.csv_models import CSVStockData
+from jpstock_watchlist.models import CSVStockData
 
 
 def test_find_col():
@@ -21,11 +24,72 @@ def test_find_col():
 def test_clean_val():
     import pandas as pd
 
-    assert clean_val(pd.NA) == "-"
-    assert clean_val(float("nan")) == "-"
+    # Missing / None / NaN cases
+    assert clean_val(None) is None
+    assert clean_val(pd.NA) is None
+    assert clean_val(float("nan")) is None
+    assert clean_val("-") is None
+    assert clean_val("--") is None
+    assert clean_val("N/A") is None
+    assert clean_val("nan") is None
+    assert clean_val("null") is None
+    assert clean_val("") is None
+
+    # Normal numeric inputs
     assert clean_val("12.34") == 12.34
     assert clean_val(45) == 45.0
-    assert clean_val("abc") == "-"
+    assert clean_val(123.456) == 123.456
+
+    # Formatting symbols & comma stripping
+    assert clean_val("1,500") == 1500.0
+    assert clean_val("1,234,567.89") == 1234567.89
+    assert clean_val("5.2%") == 5.2
+    assert clean_val("+3.5%") == 3.5
+    assert clean_val("-12.4%") == -12.4
+    assert clean_val("1500円") == 1500.0
+    assert clean_val("14.5倍") == 14.5
+
+    # Full-width characters normalization (NFKC)
+    assert clean_val("１２．３４") == 12.34  # noqa: RUF001
+    assert clean_val("１，５００") == 1500.0  # noqa: RUF001
+    assert clean_val("５．２％") == 5.2  # noqa: RUF001
+
+    # Non-finite inputs (Infinity)
+    import math
+
+    assert clean_val(math.inf) is None
+    assert clean_val(-math.inf) is None
+    assert clean_val("inf") is None
+    assert clean_val("-inf") is None
+    assert clean_val("+inf") is None
+    assert clean_val("Infinity") is None
+    assert clean_val("-Infinity") is None
+
+    # Invalid strings
+    assert clean_val("abc") is None
+    assert clean_val("---") is None
+
+
+def test_read_csv_with_fallback(tmp_path: Path):
+    # Test UTF-8 with BOM (utf-8-sig)
+    utf8_file = tmp_path / "test_utf8.csv"
+    utf8_file.write_text(
+        "コード,会社名,市場\n7203,トヨタ自動車,東プ\n", encoding="utf-8-sig"
+    )
+    fieldnames, rows = read_csv_with_fallback(utf8_file)
+    assert "コード" in fieldnames
+    assert len(rows) == 1
+    assert rows[0]["コード"] == "7203"
+
+    # Test Shift-JIS / CP932
+    cp932_file = tmp_path / "test_cp932.csv"
+    cp932_file.write_text(
+        "コード,会社名,市場\n6861,キーエンス,東プ\n", encoding="cp932"
+    )
+    fieldnames_cp, rows_cp = read_csv_with_fallback(cp932_file)
+    assert "コード" in fieldnames_cp
+    assert len(rows_cp) == 1
+    assert rows_cp[0]["コード"] == "6861"
 
 
 def test_get_market_cap_bonus():
@@ -44,7 +108,7 @@ def test_get_market_cap_bonus():
 
 
 def test_calculate_base_score_csv():
-    # Perfect scenario (should be close to Max 160 base score)
+    # Perfect scenario (Max 160 base score)
     score = calculate_base_score_csv(
         roe=20.0,
         roic=15.0,
@@ -57,14 +121,13 @@ def test_calculate_base_score_csv():
         payout_ratio_total=80.0,
         payout_ratio=45.0,
     )
-    # Each gets maximum points
     assert score == 160
 
     # Bad scenario
     score_bad = calculate_base_score_csv(
         roe=-15.0,  # -20
         roic=-10.0,  # -15
-        dividend_yield=0,  # 0
+        dividend_yield=0.0,  # 0
         peg_ratio=2.5,  # -10
         div_growth_3y=-35.0,  # -20
         predicted_per=65.0,  # -15
@@ -74,6 +137,22 @@ def test_calculate_base_score_csv():
         payout_ratio=-5.0,  # -15
     )
     assert score_bad == -115
+
+    # None values fallback
+    score_none = calculate_base_score_csv(
+        roe=None,
+        roic=None,
+        dividend_yield=None,
+        peg_ratio=None,
+        div_growth_3y=None,
+        predicted_per=None,
+        pbr=None,
+        relative_52w=None,
+        payout_ratio_total=None,
+        payout_ratio=None,
+    )
+    # PER missing (-8) + PBR missing (-8) = -16
+    assert score_none == -16
 
 
 def test_load_jpx400_tickers():
@@ -101,4 +180,3 @@ def test_load_and_analyze_csv():
 
     for i in range(len(data_new) - 1):
         assert data_new[i].score >= data_new[i + 1].score
-

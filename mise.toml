@@ -5,14 +5,10 @@ ruff = "latest"
 ty = "latest"
 uv = "latest"
 
-[env]
-_.file = ".env"
-
 [tasks]
 "fmt" = "ruff format ."
 "lint" = "ruff check --fix ."
 "type" = "ty check"
 "test" = "pytest"
 "all" = { depends = ["fmt", "lint", "type", "test"] }
-"watch" = "uv run python main.py"
-"csv" = "uv run python analyze_csv.py"
+"analyze" = "uv run python main.py"

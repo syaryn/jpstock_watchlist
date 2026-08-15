@@ -1,9 +1,12 @@
+"""CSV stock data analyzer and scoring engine."""
+
 import csv
 import math
+import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 
-from jpstock_watchlist.csv_models import CSVStockData
+from jpstock_watchlist.models import CSVStockData
 
 
 def find_col(columns: list[str], prefix: str) -> str | None:
@@ -14,40 +17,50 @@ def find_col(columns: list[str], prefix: str) -> str | None:
     return None
 
 
-def clean_val(val: object) -> float | str:
-    """Convert value to float if valid, otherwise return '-'."""
+def clean_val(val: object) -> float | None:
+    """Convert value to float if valid, handling formatting symbols and full-width chars.
+
+    Returns None if missing, NaN, or invalid.
+    """
     if val is None:
-        return "-"
+        return None
+
+    if isinstance(val, (int, float)):
+        f_val = float(val)
+        return f_val if math.isfinite(f_val) else None
+
+    # Convert to string and normalize full-width characters (NFKC)
+    s = unicodedata.normalize("NFKC", str(val)).strip()
+    if not s or s in ("-", "N/A", "nan", "null", "None", "--", "inf", "-inf", "+inf"):
+        return None
+
+    # Remove commas, percentage signs, yen signs, etc.
+    s = s.replace(",", "").replace("%", "").replace("円", "").replace("倍", "")
+
     try:
-        if val == "" or val == "-":
-            return "-"
-        if isinstance(val, (int, float, str)):
-            f_val = float(val)
-            if math.isnan(f_val):
-                return "-"
-            return f_val
+        f_val = float(s)
+        return f_val if math.isfinite(f_val) else None
     except ValueError, TypeError:
-        pass
-    return "-"
+        return None
 
 
 def calculate_base_score_csv(
-    roe: float | str,
-    roic: float | str,
-    dividend_yield: float | str,
-    peg_ratio: float | str,
-    div_growth_3y: float | str,
-    predicted_per: float | str,
-    pbr: float | str,
-    relative_52w: float | str,
-    payout_ratio_total: float | str,
-    payout_ratio: float | str,
+    roe: float | None,
+    roic: float | None,
+    dividend_yield: float | None,
+    peg_ratio: float | None,
+    div_growth_3y: float | None,
+    predicted_per: float | None,
+    pbr: float | None,
+    relative_52w: float | None,
+    payout_ratio_total: float | None,
+    payout_ratio: float | None,
 ) -> int:
     """Calculate absolute valuation score (Max 160 points total)."""
     score = 0
 
     # 1. 実績ROE (Max 30 / Min -20)
-    if isinstance(roe, (int, float)):
+    if roe is not None:
         if roe <= -10:
             score -= 20
         elif roe < 0:
@@ -64,7 +77,7 @@ def calculate_base_score_csv(
             score += 10
 
     # 2. ROIC (Max 20 / Min -15)
-    if isinstance(roic, (int, float)):
+    if roic is not None:
         if roic <= -5:
             score -= 15
         elif roic < 0:
@@ -79,7 +92,7 @@ def calculate_base_score_csv(
             score += 5
 
     # 3. 予想配当利回り (Max 15 / Min 0)
-    if isinstance(dividend_yield, (int, float)):
+    if dividend_yield is not None:
         if dividend_yield >= 4.5:
             score += 15
         elif dividend_yield >= 3.5:
@@ -90,7 +103,7 @@ def calculate_base_score_csv(
             score += 4
 
     # 4. 予想PEGレシオ (Max 20 / Min -15)
-    if isinstance(peg_ratio, (int, float)):
+    if peg_ratio is not None:
         if peg_ratio <= 0:
             score -= 15
         elif peg_ratio <= 0.5:
@@ -105,7 +118,7 @@ def calculate_base_score_csv(
             score -= 10
 
     # 5. 3年配当成長率 (Max 25 / Min -20)
-    if isinstance(div_growth_3y, (int, float)):
+    if div_growth_3y is not None:
         if div_growth_3y <= -30:
             score -= 20
         elif div_growth_3y < 0:
@@ -120,7 +133,7 @@ def calculate_base_score_csv(
             score += 5
 
     # 6. 予想PER (Max 10 / Min -15)
-    if isinstance(predicted_per, (int, float)) and predicted_per > 0:
+    if predicted_per is not None and predicted_per > 0:
         if predicted_per <= 10:
             score += 10
         elif predicted_per <= 12:
@@ -139,12 +152,12 @@ def calculate_base_score_csv(
             score -= 15
     else:
         # PER missing fallback: If profitable (ROE > 0) neutral, else penalty
-        roe_val = roe if isinstance(roe, (int, float)) else 0.0
+        roe_val = roe if roe is not None else 0.0
         if roe_val <= 0:
             score -= 8
 
     # 7. PBR (Max 10 / Min -15)
-    if isinstance(pbr, (int, float)) and pbr > 0:
+    if pbr is not None and pbr > 0:
         if pbr <= 0.8:
             score += 10
         elif pbr <= 1.0:
@@ -165,7 +178,7 @@ def calculate_base_score_csv(
         score -= 8
 
     # 8. 52週株価相対水準 (Max 10 / Min -10)
-    if isinstance(relative_52w, (int, float)):
+    if relative_52w is not None:
         if relative_52w <= 5:
             score -= 10
         elif relative_52w >= 90:
@@ -176,7 +189,7 @@ def calculate_base_score_csv(
             score += 5
 
     # 9. 総還元性向 (Max 10 / Min -5)
-    if isinstance(payout_ratio_total, (int, float)):
+    if payout_ratio_total is not None:
         if payout_ratio_total < 0:
             score -= 5
         elif payout_ratio_total >= 80:
@@ -189,7 +202,7 @@ def calculate_base_score_csv(
             score += 2
 
     # 10. 配当性向 (Max 10 / Min -15)
-    if isinstance(payout_ratio, (int, float)):
+    if payout_ratio is not None:
         if payout_ratio < 0:
             score -= 15
         elif payout_ratio >= 100.0:
@@ -228,57 +241,65 @@ def calculate_relative_scores_csv(
     for d in data:
         d["rel_score"] = 0
 
-    metrics_config = [
+    metrics_config: list[
+        tuple[
+            str,
+            bool,
+            float,
+            Callable[[float], bool],
+            Callable[[float], float] | None,
+        ]
+    ] = [
         # (key, reverse [True=higher is better], max_pts, valid_fn, cap_fn)
-        ("roe", True, 30.0, lambda v: isinstance(v, (int, float)) and v > 0, None),
-        ("roic", True, 20.0, lambda v: isinstance(v, (int, float)) and v > 0, None),
+        ("roe", True, 30.0, lambda v: v > 0, None),
+        ("roic", True, 20.0, lambda v: v > 0, None),
         (
             "dividend_yield",
             True,
             15.0,
-            lambda v: isinstance(v, (int, float)) and v >= 0,
+            lambda v: v >= 0,
             None,
         ),
         (
             "peg_ratio",
             False,
             20.0,
-            lambda v: isinstance(v, (int, float)) and v > 0,
+            lambda v: v > 0,
             None,
         ),
         (
             "div_growth_3y",
             True,
             25.0,
-            lambda v: isinstance(v, (int, float)) and v > 0,
+            lambda v: v > 0,
             None,
         ),
         (
             "predicted_per",
             False,
             10.0,
-            lambda v: isinstance(v, (int, float)) and v > 0,
+            lambda v: v > 0,
             None,
         ),
-        ("pbr", False, 10.0, lambda v: isinstance(v, (int, float)) and v > 0, None),
+        ("pbr", False, 10.0, lambda v: v > 0, None),
         (
             "relative_52w",
             False,
             10.0,
-            lambda v: isinstance(v, (int, float)) and v >= 0,
+            lambda v: v >= 0,
             None,
         ),
         (
             "payout_ratio_total",
             True,
             10.0,
-            lambda v: isinstance(v, (int, float)) and v >= 0,
+            lambda v: v >= 0,
             lambda v: min(100.0, float(v)),
         ),
     ]
 
     for key, reverse, max_pts, valid_fn, cap_fn in metrics_config:
-        valid_stocks = [d for d in data if valid_fn(d[key])]
+        valid_stocks = [d for d in data if d[key] is not None and valid_fn(d[key])]
         if not valid_stocks:
             continue
 
@@ -317,8 +338,8 @@ def calculate_relative_scores_csv(
 
     # 10. 配当性向 (Max 10) - 30%~60% optimal zone
     for d in data:
-        if isinstance(d["payout_ratio"], (int, float)):
-            p = float(d["payout_ratio"])
+        p = d["payout_ratio"]
+        if p is not None:
             if 30.0 <= p <= 60.0:
                 d["rel_score"] += 10
             elif 0 < p < 30.0:
@@ -339,7 +360,7 @@ def load_jpx400_tickers(
         return set()
 
     codes = set()
-    for enc in ("utf-8-sig", "cp932", "utf-8"):
+    for enc in ("utf-8-sig", "cp932", "utf-8", "euc-jp"):
         try:
             with open(path, encoding=enc) as f:
                 reader = csv.DictReader(f)
@@ -363,6 +384,29 @@ def load_jpx400_tickers(
     return codes
 
 
+def read_csv_with_fallback(
+    path: Path,
+) -> tuple[list[str], list[dict[str, str]]]:
+    """Read CSV trying multiple encodings (utf-8-sig, cp932, utf-8, euc-jp)."""
+    encodings = ("utf-8-sig", "cp932", "utf-8", "euc-jp")
+    for enc in encodings:
+        try:
+            with open(path, encoding=enc) as f:
+                reader = csv.DictReader(f)
+                if reader.fieldnames is None:
+                    continue
+                fieldnames = list(reader.fieldnames)
+                if any("コード" in col or "会社名" in col for col in fieldnames):
+                    return fieldnames, list(reader)
+        except UnicodeDecodeError, csv.Error:
+            continue
+
+    # Fallback to cp932 with replace on failure
+    with open(path, encoding="cp932", errors="replace") as f:
+        reader = csv.DictReader(f)
+        return list(reader.fieldnames or []), list(reader)
+
+
 def load_and_analyze_csv(
     filepath: str,
     jpx400_filepath: str | Path = Path("input/screener_result.csv"),
@@ -374,121 +418,112 @@ def load_and_analyze_csv(
 
     jpx400_codes = load_jpx400_tickers(jpx400_filepath)
 
-    # Read CSV with cp932/shift_jis using standard csv module
-    with open(path, encoding="cp932", errors="replace") as f:
-        reader = csv.DictReader(f)
-        fieldnames = list(reader.fieldnames) if reader.fieldnames else []
+    fieldnames, rows = read_csv_with_fallback(path)
 
-        # Map column headers dynamically
-        col_mapping = {
-            "code": "コード",
-            "name": "会社名",
-            "market": "市場",
-            "sector": "業種",
-            "price": find_col(fieldnames, "[基本項目]直近終値"),
-            "market_cap": find_col(fieldnames, "[基礎条件]時価総額"),
-            "roe": find_col(fieldnames, "[指標]実績ROE"),
-            "roic": find_col(fieldnames, "[指標]ROIC"),
-            "yield": find_col(fieldnames, "[指標]予想配当利回り"),
-            "peg": find_col(fieldnames, "[指標]予想PEGレシオ"),
-            "growth": find_col(fieldnames, "[指標]3年配当成長率"),
-            "predicted_per": find_col(fieldnames, "[指標]予想PER"),
-            "pbr": find_col(fieldnames, "[指標]PBR"),
-            "relative_52w": find_col(fieldnames, "[株価]52週株価相対水準"),
-            "payout_ratio": find_col(fieldnames, "[指標]配当性向"),
-            "payout": find_col(fieldnames, "[指標]総還元性向"),
-        }
+    # Map column headers dynamically
+    col_mapping = {
+        "code": "コード",
+        "name": "会社名",
+        "market": "市場",
+        "sector": "業種",
+        "price": find_col(fieldnames, "[基本項目]直近終値"),
+        "market_cap": find_col(fieldnames, "[基礎条件]時価総額"),
+        "roe": find_col(fieldnames, "[指標]実績ROE"),
+        "roic": find_col(fieldnames, "[指標]ROIC"),
+        "yield": find_col(fieldnames, "[指標]予想配当利回り"),
+        "peg": find_col(fieldnames, "[指標]予想PEGレシオ"),
+        "growth": find_col(fieldnames, "[指標]3年配当成長率"),
+        "predicted_per": find_col(fieldnames, "[指標]予想PER"),
+        "pbr": find_col(fieldnames, "[指標]PBR"),
+        "relative_52w": find_col(fieldnames, "[株価]52週株価相対水準"),
+        "payout_ratio": find_col(fieldnames, "[指標]配当性向"),
+        "payout": find_col(fieldnames, "[指標]総還元性向"),
+    }
 
-        # Verify essential columns exist
-        for key, col in col_mapping.items():
-            if col is None and key in ["code", "name", "price"]:
-                raise ValueError(
-                    f"Essential column mapped to {key} was not found in CSV."
-                )
+    # Verify essential columns exist
+    for key, col in col_mapping.items():
+        if col is None and key in ["code", "name", "price"]:
+            raise ValueError(f"Essential column mapped to {key} was not found in CSV.")
 
-        raw_stocks = []
-        for row in reader:
-            val = row.get(col_mapping["code"])
-            if val is None or str(val).strip() == "":
-                raise ValueError("Stock code is missing in row.")
-            code_raw = str(val).strip()
-            if code_raw.endswith(".0"):
-                code_raw = code_raw[:-2]
-            ticker = f"{code_raw}.T"
+    raw_stocks = []
+    for row in rows:
+        val = row.get(col_mapping["code"])
+        if val is None or str(val).strip() == "":
+            raise ValueError("Stock code is missing in row.")
+        code_raw = str(val).strip()
+        if code_raw.endswith(".0"):
+            code_raw = code_raw[:-2]
+        ticker = f"{code_raw}.T"
 
-            # Price and market cap
-            price_col = col_mapping["price"]
-            price = clean_val(row.get(price_col)) if price_col else "-"
+        # Price and market cap
+        price_col = col_mapping["price"]
+        price = clean_val(row.get(price_col)) if price_col else None
 
-            # Convert market cap from 100M JPY (億円) to JPY
-            mcap_col = col_mapping["market_cap"]
-            mcap_raw = row.get(mcap_col) if mcap_col else None
-            mcap_clean = clean_val(mcap_raw)
-            market_cap_jpy = (
-                mcap_clean * 100_000_000
-                if isinstance(mcap_clean, (int, float))
-                else None
-            )
+        # Convert market cap from 100M JPY (億円) to JPY
+        mcap_col = col_mapping["market_cap"]
+        mcap_raw = row.get(mcap_col) if mcap_col else None
+        mcap_clean = clean_val(mcap_raw)
+        market_cap_jpy = mcap_clean * 100_000_000 if mcap_clean is not None else None
 
-            # Gather indicators
-            roe_col = col_mapping["roe"]
-            roic_col = col_mapping["roic"]
-            yield_col = col_mapping["yield"]
-            peg_col = col_mapping["peg"]
-            growth_col = col_mapping["growth"]
-            per_col = col_mapping["predicted_per"]
-            pbr_col = col_mapping["pbr"]
-            rel_col = col_mapping["relative_52w"]
-            payout_r_col = col_mapping["payout_ratio"]
-            payout_col = col_mapping["payout"]
+        # Gather indicators
+        roe_col = col_mapping["roe"]
+        roic_col = col_mapping["roic"]
+        yield_col = col_mapping["yield"]
+        peg_col = col_mapping["peg"]
+        growth_col = col_mapping["growth"]
+        per_col = col_mapping["predicted_per"]
+        pbr_col = col_mapping["pbr"]
+        rel_col = col_mapping["relative_52w"]
+        payout_r_col = col_mapping["payout_ratio"]
+        payout_col = col_mapping["payout"]
 
-            roe = clean_val(row.get(roe_col)) if roe_col else "-"
-            roic = clean_val(row.get(roic_col)) if roic_col else "-"
-            dividend_yield = clean_val(row.get(yield_col)) if yield_col else "-"
-            peg_ratio = clean_val(row.get(peg_col)) if peg_col else "-"
-            div_growth_3y = clean_val(row.get(growth_col)) if growth_col else "-"
-            predicted_per = clean_val(row.get(per_col)) if per_col else "-"
-            pbr = clean_val(row.get(pbr_col)) if pbr_col else "-"
-            relative_52w = clean_val(row.get(rel_col)) if rel_col else "-"
-            payout_ratio = clean_val(row.get(payout_r_col)) if payout_r_col else "-"
-            payout_ratio_total = clean_val(row.get(payout_col)) if payout_col else "-"
+        roe = clean_val(row.get(roe_col)) if roe_col else None
+        roic = clean_val(row.get(roic_col)) if roic_col else None
+        dividend_yield = clean_val(row.get(yield_col)) if yield_col else None
+        peg_ratio = clean_val(row.get(peg_col)) if peg_col else None
+        div_growth_3y = clean_val(row.get(growth_col)) if growth_col else None
+        predicted_per = clean_val(row.get(per_col)) if per_col else None
+        pbr = clean_val(row.get(pbr_col)) if pbr_col else None
+        relative_52w = clean_val(row.get(rel_col)) if rel_col else None
+        payout_ratio = clean_val(row.get(payout_r_col)) if payout_r_col else None
+        payout_ratio_total = clean_val(row.get(payout_col)) if payout_col else None
 
-            # Absolute score
-            base_score = calculate_base_score_csv(
-                roe=roe,
-                roic=roic,
-                dividend_yield=dividend_yield,
-                peg_ratio=peg_ratio,
-                div_growth_3y=div_growth_3y,
-                predicted_per=predicted_per,
-                pbr=pbr,
-                relative_52w=relative_52w,
-                payout_ratio_total=payout_ratio_total,
-                payout_ratio=payout_ratio,
-            )
+        # Absolute score
+        base_score = calculate_base_score_csv(
+            roe=roe,
+            roic=roic,
+            dividend_yield=dividend_yield,
+            peg_ratio=peg_ratio,
+            div_growth_3y=div_growth_3y,
+            predicted_per=predicted_per,
+            pbr=pbr,
+            relative_52w=relative_52w,
+            payout_ratio_total=payout_ratio_total,
+            payout_ratio=payout_ratio,
+        )
 
-            raw_stocks.append(
-                {
-                    "ticker": ticker,
-                    "name": str(row.get(col_mapping["name"], "")),
-                    "market": str(row.get(col_mapping["market"], "")),
-                    "sector": str(row.get(col_mapping["sector"], "")),
-                    "current_price": price,
-                    "market_cap": market_cap_jpy,
-                    "roe": roe,
-                    "roic": roic,
-                    "dividend_yield": dividend_yield,
-                    "peg_ratio": peg_ratio,
-                    "div_growth_3y": div_growth_3y,
-                    "predicted_per": predicted_per,
-                    "pbr": pbr,
-                    "relative_52w": relative_52w,
-                    "payout_ratio": payout_ratio,
-                    "payout_ratio_total": payout_ratio_total,
-                    "base_score": base_score,
-                    "market_cap_bonus": get_market_cap_bonus(market_cap_jpy),
-                }
-            )
+        raw_stocks.append(
+            {
+                "ticker": ticker,
+                "name": str(row.get(col_mapping["name"], "")),
+                "market": str(row.get(col_mapping["market"], "")),
+                "sector": str(row.get(col_mapping["sector"], "")),
+                "current_price": price,
+                "market_cap": market_cap_jpy,
+                "roe": roe,
+                "roic": roic,
+                "dividend_yield": dividend_yield,
+                "peg_ratio": peg_ratio,
+                "div_growth_3y": div_growth_3y,
+                "predicted_per": predicted_per,
+                "pbr": pbr,
+                "relative_52w": relative_52w,
+                "payout_ratio": payout_ratio,
+                "payout_ratio_total": payout_ratio_total,
+                "base_score": base_score,
+                "market_cap_bonus": get_market_cap_bonus(market_cap_jpy),
+            }
+        )
 
     # Apply relative scoring
     scored_stocks = calculate_relative_scores_csv(raw_stocks)
@@ -526,4 +561,3 @@ def load_and_analyze_csv(
 
     # Sort descending by score
     return sorted(results, key=lambda x: x.score, reverse=True)
-
